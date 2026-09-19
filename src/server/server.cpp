@@ -1,5 +1,4 @@
 #include <cstring>
-#include <iostream>
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -8,6 +7,11 @@
 #include <vector>
 #include <algorithm>
 #include <csignal>
+#include <cerrno>
+#include <stdexcept>
+#include <string>
+#include "internal/logger.h"
+#include "spdlog/spdlog.h"
 
 volatile std::sig_atomic_t shuttingDown = 0;
 
@@ -20,15 +24,28 @@ int startServer(int port)
 {
     int serverSocket = socket(AF_INET, SOCK_STREAM, 0);
 
+    if (serverSocket < 0)
+    {
+        throw std::runtime_error(std::string("could not create socket: ") + std::strerror(errno));
+    }
+
     sockaddr_in serverAddress;
     serverAddress.sin_family = AF_INET;
     serverAddress.sin_port = htons(port);
 
     serverAddress.sin_addr.s_addr = INADDR_ANY;
 
-    bind(serverSocket, (struct sockaddr *)&serverAddress, sizeof(serverAddress));
+    if (bind(serverSocket, (struct sockaddr *)&serverAddress, sizeof(serverAddress)) < 0)
+    {
+        throw std::runtime_error("port already in use");
+    }
 
-    listen(serverSocket, SOMAXCONN);
+    if (listen(serverSocket,  SOMAXCONN) < 0)
+    {
+        const std::string error = std::strerror(errno);
+        close(serverSocket);
+        throw std::runtime_error("could not listen: " + error);
+    }
 
     std::vector<int> clients;
     signal(SIGINT, signalHandler);
@@ -58,7 +75,7 @@ int startServer(int port)
 
         if (result < 0)
         {
-            std::perror("select");
+            SPDLOG_ERROR("select failed: {}", std::strerror(errno));
             break;
         }
 
@@ -68,7 +85,6 @@ int startServer(int port)
             socklen_t clientAddressLength = sizeof(clientAddress);
             int clientSocket = accept(serverSocket, (struct sockaddr *)&clientAddress, &clientAddressLength);
 
-            std::cout << clientSocket << std::endl;
             if (clientSocket != -1)
             {
                 clients.push_back(clientSocket);
@@ -81,7 +97,11 @@ int startServer(int port)
 
                 int clientPort = ntohs(clientAddress.sin_port);
                 // replace with write to client
-                printf("Client connected from %s:%d\n", clientIP, clientPort);
+                SPDLOG_INFO("Client connected from {}:{} (socket {})", clientIP, clientPort, clientSocket);
+            }
+            else
+            {
+                SPDLOG_ERROR("accept failed: {}", std::strerror(errno));
             }
         }
 
@@ -98,10 +118,11 @@ int startServer(int port)
                 {
                     close(clientSoc);
                     it = clients.erase(it);
-                    printf("Client disconnected\n");
+                    SPDLOG_INFO("Client disconnected (socket {})", clientSoc);
                     continue;
                 }
-                std::cout << "Message from client: " << buffer << std::endl;
+                SPDLOG_INFO("Message from client on socket {}: {}", clientSoc,
+                            std::string(buffer, static_cast<std::size_t>(bytes)));
             }
             ++it;
         }
@@ -115,7 +136,7 @@ int startServer(int port)
         close(client);
     }
     close(serverSocket);
-    std::cout << "Ok Bie";
+    SPDLOG_INFO("Ok Bie");
 
     return 0;
 }

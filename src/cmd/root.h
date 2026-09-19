@@ -1,2 +1,4 @@
 
-int execute(int argc, char **argv);
+#pragma once
+
+int execute(int argc, char** argv);

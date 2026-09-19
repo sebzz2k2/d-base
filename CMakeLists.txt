@@ -14,4 +14,7 @@ target_include_directories(db PRIVATE
 )
 
 find_package(CLI11 CONFIG REQUIRED)
+find_package(spdlog CONFIG REQUIRED)
+
 target_link_libraries(db PRIVATE CLI11::CLI11)
+target_link_libraries(db PRIVATE spdlog::spdlog)
