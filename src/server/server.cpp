@@ -44,6 +44,8 @@ int startServer(int port)
     }
 
     signal(SIGINT, signalHandler);
+
+    // TODO: io_uring??
     const int epollFd = epoll_create1(0);
     if (epollFd == -1)
     {
