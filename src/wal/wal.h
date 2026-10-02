@@ -2,6 +2,8 @@
 #include <thread>
 #include <queue>
 #include <mutex>
+#include <future>
+#include "internal/cmd/commands.h"
 
 enum class WALWriteResult
 {
@@ -18,12 +20,25 @@ struct WALConfig
     const unsigned int max_write_fails = 5;
 };
 
+struct WALRecord
+{
+    int txn_id;
+    VaulticCmds command;
+    std::string key;
+    std::string value;
+};
+
+struct WALRequest
+{
+    WALRecord record;
+    std::promise<uint8_t> completion;
+};
 class wal
 {
 public:
     wal(const WALConfig &config);
 
-    void add_wal_entry(int i);
+    void add_wal_entry(WALRequest req);
     void loop();
 
 private:
@@ -33,8 +48,10 @@ private:
 
     std::mutex mtx_;
     // TODO: might want to implement queue
-    std::queue<int> q_;
+    std::queue<WALRequest> q_;
     WALConfig config_;
 
     WALWriteResult bulk_flush_();
+    std::string marshal_(WALRecord *record);
+    void unmarshall_();
 };

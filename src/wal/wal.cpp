@@ -9,13 +9,15 @@
 #include <cstring>
 #include <stdexcept>
 #include "constants.h"
+#include <utility>
+#include <exception>
 
 wal::wal(const WALConfig &config)
     : processing_(false), config_(config)
 {
 }
 
-void wal::add_wal_entry(int i) // TODO: change to type WAL
+void wal::add_wal_entry(WALRequest req)
 {
     if (wal::q_.size() == wal::config_.queue_capacity)
     {
@@ -24,7 +26,7 @@ void wal::add_wal_entry(int i) // TODO: change to type WAL
 
     if (wal::mtx_.try_lock())
     {
-        wal::q_.push(i); // TODO: check if emplace is needed
+        wal::q_.push(req); // TODO: check if emplace is needed
         wal::mtx_.unlock();
     }
 }
@@ -45,7 +47,6 @@ WALWriteResult wal::bulk_flush_()
     if (q_.empty())
         return WALWriteResult::Durable;
 
-    // TODO: replace this path with the configured WAL file path.
     const int fd = open(constants::wal_file.c_str(), O_WRONLY | O_CREAT | O_APPEND,
                         S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (fd == -1)
@@ -56,35 +57,57 @@ WALWriteResult wal::bulk_flush_()
         return WALWriteResult::WriteFailed;
     }
 
-    std::string str = "";
+    std::queue<WALRequest> write_success_q_;
     while (wal::q_.size() != 0)
     {
-        int val = wal::q_.front();
-        // TODO: build WAL entry and append to string
+        WALRequest val = std::move(wal::q_.front());
+        std::string str = wal::marshal_(&val.record);
+        if (write(fd, "", str.length()) == -1)
+        {
+            val.completion.set_exception(std::make_exception_ptr(
+                std::runtime_error("Failed to write WAL: " + std::string(std::strerror(errno)))));
+        }
+        write_success_q_.push(val);
+        wal::q_.pop();
     }
 
-    if (write(fd, "", str.length()) == -1)
-    {
-        ++write_failed_count_;
-        close(fd);
-        return WALWriteResult::WriteFailed;
-    }
-    write_failed_count_ = 0;
-
+    bool success = true;
     while (fsync(fd) == -1)
     {
         ++fsync_failed_count_;
         if (fsync_failed_count_ >= config_.max_fsync_fails)
         {
             close(fd);
-            throw std::runtime_error("Unable to sync WAL after multiple failures: " + std::string(std::strerror(errno)));
+            success = false;
         }
-
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    }
+
+    while (write_success_q_.size() != 0)
+    {
+        WALRequest val = std::move(write_success_q_.front());
+        if (success == true)
+        {
+            val.completion.set_value(1);
+        }
+        else
+        {
+            val.completion.set_exception(std::make_exception_ptr(
+                std::runtime_error("Failed to sync WAL after multiple attempts")));
+        }
     }
 
     fsync_failed_count_ = 0;
     close(fd);
 
     return WALWriteResult::Durable;
+}
+
+std::string wal::marshal_(WALRecord *record)
+{
+    
+}
+
+void wal::unmarshall_()
+{
 }
