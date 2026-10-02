@@ -3,6 +3,8 @@
 #include <queue>
 #include <mutex>
 #include <future>
+#include <cstdint>
+#include <string>
 #include "internal/cmd/commands.h"
 
 enum class WALWriteResult
@@ -10,6 +12,14 @@ enum class WALWriteResult
     Durable,
     WriteFailed,
     SyncFailed
+};
+
+enum class WALRecordType : std::uint8_t
+{
+    FULL = 1,
+    FIRST = 2,
+    MIDDLE = 3,
+    LAST = 4
 };
 
 struct WALConfig
@@ -22,7 +32,8 @@ struct WALConfig
 
 struct WALRecord
 {
-    int txn_id;
+    std::uint32_t txn_id;
+    WALRecordType type = WALRecordType::FULL;
     VaulticCmds command;
     std::string key;
     std::string value;
@@ -52,6 +63,6 @@ private:
     WALConfig config_;
 
     WALWriteResult bulk_flush_();
-    std::string marshal_(WALRecord *record);
+    std::string marshal_(const WALRecord *record, std::size_t &block_offset);
     void unmarshall_();
 };
