@@ -4,9 +4,17 @@
 #include "server/server.h"
 #include "spdlog/spdlog.h"
 #include <thread>
+#include <filesystem>
+#include "constants.h"
 
 int execute(int argc, char **argv)
 {
+    if (constants::get_os() != constants::SystemOS::Linux)
+    {
+        SPDLOG_ERROR("Developed only for Linux for now xD");
+        return 1;
+    }
+
     CLI::App app{};
 
     int flag_port = 5381;
@@ -59,7 +67,12 @@ int execute(int argc, char **argv)
             flag_port,
             logLevel,
             workers);
-        return startServer(flag_port);
+
+        std::filesystem::path data_folder = constants::get_data_path();
+        std::filesystem::create_directories(data_folder);
+
+        
+        // return startServer(flag_port);
     }
     catch (const std::exception &error)
     {

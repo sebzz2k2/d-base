@@ -8,6 +8,7 @@
 #include <cerrno>
 #include <cstring>
 #include <stdexcept>
+#include "constants.h"
 
 wal::wal(const WALConfig &config)
     : processing_(false), config_(config)
@@ -45,7 +46,7 @@ WALWriteResult wal::bulk_flush_()
         return WALWriteResult::Durable;
 
     // TODO: replace this path with the configured WAL file path.
-    const int fd = open("/data/", O_WRONLY | O_CREAT | O_APPEND,
+    const int fd = open(constants::wal_file.c_str(), O_WRONLY | O_CREAT | O_APPEND,
                         S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH);
     if (fd == -1)
     {
