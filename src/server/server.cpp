@@ -36,7 +36,7 @@ int startServer(int port)
         throw std::runtime_error("port already in use");
     }
 
-    if (listen(serverSocket,  SOMAXCONN) < 0)
+    if (listen(serverSocket, SOMAXCONN) < 0)
     {
         const std::string error = std::strerror(errno);
         close(serverSocket);
@@ -72,7 +72,8 @@ int startServer(int port)
         const int eventCount = epoll_wait(epollFd, events, MAX_EVENTS, -1);
         if (eventCount == -1)
         {
-            if (errno == EINTR && shuttingDown) break;
+            if (errno == EINTR && shuttingDown)
+                break;
             SPDLOG_ERROR("epoll_wait failed: {}", std::strerror(errno));
             break;
         }
@@ -92,7 +93,7 @@ int startServer(int port)
                 }
 
                 event = {};
-                
+
                 // TODO: explore EPOLLET later
                 event.events = EPOLLIN;
                 event.data.fd = clientSock;

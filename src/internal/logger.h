@@ -2,8 +2,9 @@
 
 #include <string>
 
-namespace logging {
+namespace logging
+{
 
-void initialize(const std::string& level);
+    void initialize(const std::string &level);
 
 }
