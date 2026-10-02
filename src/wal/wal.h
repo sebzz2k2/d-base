@@ -1,0 +1,40 @@
+#pragma once
+#include <thread>
+#include <queue>
+#include <mutex>
+
+enum class WALWriteResult
+{
+    Durable,
+    WriteFailed,
+    SyncFailed
+};
+
+struct WALConfig
+{
+    unsigned flush_interval_ms = 50;
+    unsigned int queue_capacity = 1000;
+    const unsigned int max_fsync_fails = 5;
+    const unsigned int max_write_fails = 5;
+};
+
+class wal
+{
+public:
+    wal(const WALConfig &config);
+
+    void add_wal_entry(int i);
+    void loop();
+
+private:
+    bool processing_;
+    int write_failed_count_ = 0;
+    int fsync_failed_count_ = 0;
+
+    std::mutex mtx_;
+    // TODO: might want to implement queue
+    std::queue<int> q_;
+    WALConfig config_;
+
+    WALWriteResult bulk_flush_();
+};
