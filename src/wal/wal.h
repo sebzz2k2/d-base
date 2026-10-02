@@ -4,6 +4,7 @@
 #include <mutex>
 #include <future>
 #include <cstdint>
+#include <cstddef>
 #include <string>
 #include "internal/cmd/commands.h"
 
@@ -32,6 +33,7 @@ struct WALConfig
 
 struct WALRecord
 {
+    std::uint64_t lsn = 0;
     std::uint32_t txn_id;
     WALRecordType type = WALRecordType::FULL;
     VaulticCmds command;
@@ -56,6 +58,7 @@ private:
     bool processing_;
     int write_failed_count_ = 0;
     int fsync_failed_count_ = 0;
+    std::uint64_t next_lsn_ = 1;
 
     std::mutex mtx_;
     // TODO: might want to implement queue

@@ -19,6 +19,7 @@ namespace
     constexpr std::size_t kHeaderSize = sizeof(std::uint32_t) +
                                         sizeof(std::uint16_t) +
                                         sizeof(std::uint8_t) +
+                                        sizeof(std::uint64_t) +
                                         sizeof(std::uint32_t);
 
     void append_u16(std::string &out, std::uint16_t value)
@@ -30,6 +31,12 @@ namespace
     void append_u32(std::string &out, std::uint32_t value)
     {
         for (unsigned shift = 0; shift < 32; shift += 8)
+            out.push_back(static_cast<char>(value >> shift));
+    }
+
+    void append_u64(std::string &out, std::uint64_t value)
+    {
+        for (unsigned shift = 0; shift < 64; shift += 8)
             out.push_back(static_cast<char>(value >> shift));
     }
 
@@ -62,6 +69,7 @@ void wal::add_wal_entry(WALRequest req)
         return;
     }
 
+    req.record.lsn = next_lsn_++;
     q_.push(std::move(req));
 }
 
@@ -198,6 +206,7 @@ std::string wal::marshal_(const WALRecord *record, std::size_t &block_offset)
         std::string body;
         append_u16(body, static_cast<std::uint16_t>(fragment_size));
         body.push_back(static_cast<char>(type));
+        append_u64(body, record->lsn);
         append_u32(body, record->txn_id);
         body.append(payload, payload_offset, fragment_size);
 
